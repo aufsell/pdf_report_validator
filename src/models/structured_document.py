@@ -1,20 +1,46 @@
-from collections import defaultdict
-from dataclasses import asdict, dataclass, is_dataclass
+import base64
+from dataclasses import asdict, dataclass, fields, is_dataclass
 from enum import Enum
 import json
 import re
-from typing import List, Optional
 
-@dataclass
-class ColumnInfo:
-    left_border: float
-    right_border: float
+def get_dominant_style(blocks: list[TextBlock]) -> Style:
+    if not blocks:
+        return Style()
+    style_weights = {}
+    for b in blocks:
+        weight = len(b.text)
+        style_weights[b.style] = style_weights.get(b.style, 0) + weight
+    return max(style_weights, key=style_weights.get)
 
-@dataclass
-class TableInfo:
-    page: int
-    columns: list[ColumnInfo]
-    horizontal_lines: list[float]
+def split_column_to_paragraphs(column: list[TextBlock]) -> list[list[TextBlock]]:
+    result = []
+    blocks_iter = iter(tb for tb in column if not tb.empty())
+    first_tb = next(blocks_iter, None)
+    if first_tb is None:
+        return []
+
+    current_paragraph = [first_tb]
+
+    for tb in blocks_iter:
+        if is_same_paragraph(current_paragraph, tb):
+            current_paragraph.append(tb)
+        else:
+            result.append(current_paragraph)
+            current_paragraph = [tb]
+
+    result.append(current_paragraph)
+    return result
+
+def group_columns(line_blocks: list[LineBlock]) -> list[list[TextBlock]]:
+    if not line_blocks:
+        return []
+    n_cols = len(line_blocks[0].blocks)
+    cols = [[] for _ in range(n_cols)]
+    for lb in line_blocks:
+        for i, tb in enumerate(lb.blocks):
+            cols[i].append(tb)
+    return cols
 
 def detect_alignment(
     lines: list[TextBlock],
@@ -74,27 +100,18 @@ def detect_alignment(
     return TextAllignment.LEFT
 
 
-def group_columns(line_blocks: List[LineBlock]) -> list[list[TextBlock]]:
-    if not line_blocks:
-        return []
-    n_cols = len(line_blocks[0].text_blocks)
-    cols = [[] for _ in range(n_cols)]
-    for lb in line_blocks:
-        for i, tb in enumerate(lb.text_blocks):
-            cols[i].append(tb)
-    return cols
-
 def is_list_start(text: str) -> bool:
     if not text:
         return False
     s = text.lstrip()
     list_pattern = r'^(' \
-                   r'\d+([\.\)]|\.\d+\.?)|' \
-                   r'[a-zA-Zа-яА-Я][\.\)]|' \
-                   r'[\u2022\u2023\u25E6\u2043\u2219\u25CB\u25CF\u25A0\u25AA\-—\*]' \
-                   r')\s+'
+               r'\d+([\.\)]|(\.\d+)+\.?)|' \
+               r'[a-zA-Zа-яА-Я][\.\)]|' \
+               r'[\u2022\u2023\u25E6\u2043\u2219\u25CB\u25CF\u25A0\u25AA\-—\*]' \
+               r')\s+'
     
     return bool(re.match(list_pattern, s))
+
 
 def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float = 0.8):
     if not prev_tbs:
@@ -133,95 +150,23 @@ def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float
     return not is_last_incomplete
 
 
-#def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, column_info: ColumnInfo, x_tol: float = 0.8):
-    if not prev_tbs:
-        return True
-    last_tb = prev_tbs[-1]
-    if last_tb.style != cur_tb.style:
-        return False
+@dataclass
+class ColumnInfo:
+    left_border: float
+    right_border: float
 
-    last_text = last_tb.text.strip()
-    cur_text = cur_tb.text.strip()
-
-    if is_list_start(cur_text):
-        return False
-
-    if cur_text and (cur_text[0].islower() or last_text.endswith("-")):
-        return True
-    
-    body_for_left = prev_tbs[1:]
-
-    if not body_for_left:
-        if is_list_start(last_tb) and cur_tb.bbox.x0 - last_tb.bbox.x0 > x_tol:
-            return True
-        if cur_tb.bbox.x0 < last_tb.bbox.x0 - x_tol:
-            return True
-        if abs(cur_tb.bbox.x0 - last_tb.bbox.x0) < x_tol:
-            return True
-        return False
-    
-    p_x0 = min(tb.bbox.x0 for tb in body_for_left)
-    p_x1 = max(tb.bbox.x1 for tb in prev_tbs)
-
-    if (cur_tb.bbox.x0 - p_x0) >= x_tol:
-        return False
-    
-    is_last_incomplete = (p_x1 - last_tb.bbox.x1) >= x_tol
-    if is_last_incomplete:
-        return False
-    
-    is_left_aligned = all(abs(tb.bbox.x0 - p_x0) < x_tol for tb in body_for_left)
-    is_right_aligned = all(abs(tb.bbox.x1 - p_x1) < x_tol for tb in prev_tbs)
-
-    first_line_indent = prev_tbs[0].bbox.x0 - p_x0
-    if abs((cur_tb.bbox.x0 - p_x0) - first_line_indent) < x_tol:
-        return False
-    
-    if is_left_aligned:
-        if abs(cur_tb.bbox.x0 - p_x0) < x_tol:
-            return True
-        if cur_tb.bbox.x0 > p_x0 + x_tol:
-            return False
-        
-    if is_right_aligned:
-        if abs(cur_tb.bbox.x1 - p_x1) < x_tol:
-            return True
-        return False
-    
-    return abs(cur_tb.bbox.x0 - p_x0) < x_tol
-
-
-def split_column_to_paragraphs(column: list[TextBlock], column_info: ColumnInfo) -> list[list[TextBlock]]:
-    result = []
-    blocks_iter = iter(tb for tb in column if not tb.is_empty())
-    first_tb = next(blocks_iter, None)
-    if first_tb is None:
-        return []
-
-    current_paragraph = [first_tb]
-
-    for tb in blocks_iter:
-        if is_same_paragraph(current_paragraph, tb):
-            current_paragraph.append(tb)
-        else:
-            result.append(current_paragraph)
-            current_paragraph = [tb]
-
-    result.append(current_paragraph)
-    return result
-
+@dataclass
+class TableInfo:
+    page: int
+    columns: list[ColumnInfo]
+    horizontal_lines: list[float]
 
 @dataclass
 class Bbox:
     x0: float
-    y0: float
     x1: float
+    y0: float
     y1: float
-
-@dataclass
-class BlockCoordinate:
-    start_page: int
-    start_block: int
 
 @dataclass(frozen=True)
 class Style:
@@ -235,24 +180,79 @@ class Style:
             self.size == other.size and
             self.color == other.color
         )
-    
+
 @dataclass
-class ParagraphStyle:
+class AnchorBlock:
+    bbox: Bbox
+
+@dataclass
+class TextBlock(AnchorBlock):
+    text: str
     style: Style
-    left_indent: float
-    text_alignment: TextAllignment
-    spacing: float
+
+    @classmethod
+    def from_span(cls, span: dict):
+        x0, y0, x1, y1 = span["bbox"]
+        bbox = Bbox(x0, x1, y0, y1)
+        style = Style(
+            font=span.get("font", ""),
+            size=span.get("size", 0.0),
+            color=span.get("color", 0),
+        )
+        text = span.get("text", "")
+        return cls(bbox, text, style)
+
+    def empty(self):
+        return not self.text.strip()
+    
+    def compute_left_indent(self, left_border):
+        return self.bbox.x0 - left_border
+    
+    def compute_right_indent(self, right_border):
+        return right_border - self.bbox.x1
 
 
-class BlockType(Enum):
-    TITLE = 1
-    TOC = 2
-    SECTION = 4
-    APPENDIX = 5
-    TABLE = 6
-    PICTURE = 7
-    PARAGRAPH = 8
+@dataclass
+class ImageBlock(AnchorBlock):
+    image: str
+    @classmethod
+    def from_image(cls, block: dict):
+        bbox = block["bbox"]
+        new_bbox = Bbox(bbox[0], bbox[2], bbox[1], bbox[3])
+        image = block.get("image")
+        image_str = base64.b64encode(image).decode('ascii')
+        return cls(new_bbox, image_str)
 
+@dataclass
+class LineBlock(AnchorBlock):
+    blocks: list[AnchorBlock]
+    page: int
+    def __init__(self, page, blocks: list[AnchorBlock]):
+        self.blocks = blocks
+        self.page = page
+        y1 = max(b.bbox.y1 for b in blocks)
+        first_block = blocks[0]
+        last_block = blocks[-1]
+        self.bbox = Bbox(first_block.bbox.x0, last_block.bbox.x1, first_block.bbox.y0, y1)
+    def text(self):
+        return "".join(block.text.strip() for block in self.blocks)
+
+@dataclass
+class TableCaption:
+    title: str
+    num: int
+    table_ref: TableBlock = None 
+
+@dataclass
+class FigureCaption:
+    title: str
+    num: int
+    figure_ref: FigureBlock = None  
+
+#==================================================================================#
+
+class Block:
+    pass
 
 class TextAllignment(Enum):
     LEFT = 1
@@ -261,74 +261,25 @@ class TextAllignment(Enum):
     WIDTH = 4
 
 @dataclass
-class Block:
-    id: int
-    start: BlockCoordinate
-
-
-@dataclass
-class BlockInfo:
-    id: int
-    block: Block
-    subblocks: list
-
-
-@dataclass
-class TextBlock:
-    text: str
-    bbox: Bbox
+class ParagraphStyle:
     style: Style
-
-    def compute_left_indent(self, left_border: float):
-        return self.bbox.x0 - left_border
-    
-    def compute_right_indent(self, right_border: float):
-        return right_border - self.bbox.x1
-    
-    def is_empty(self) -> bool:
-        return not self.text
-
-
-@dataclass
-class LineBlock:
-    text_blocks: list[TextBlock]
-    bbox: Bbox
-
-    def compute_left_indent(self, left_border: float):
-        return self.bbox.x0 - left_border
-    
-    def compute_right_indent(self, right_border: float):
-        return right_border - self.bbox.x1
-    
-    def text(self):
-        return " ".join(tb.text for tb in self.text_blocks if tb.text).strip()
-
+    left_indent: float
+    text_alignment: TextAllignment
+    spacing: float
 
 @dataclass
 class ParagraphBlock(Block):
-    bbox: Bbox = None
     main_style: ParagraphStyle = None
     text: str = None
-
-    def __init__(self, id: int, coord: BlockCoordinate, lines: list[TextBlock], left_border: float, right_border: float):
-        self.id = id
-        self.start = coord
-        left_indent = None
+    def __init__(self, lines: list[TextBlock], left_border: float, right_border: float):
         spacing = 0.0
-        main_style = None
 
+        # Определяем полный текст абзаца
         lines_text: str = ""
         for line in lines:
             text = line.text.strip()
             lines_text = (lines_text[:-1] if lines_text.endswith("-") else lines_text + (" " if lines_text else "")) + text
         self.text = lines_text
-
-        if lines:
-            x0 = min(lb.bbox.x0 for lb in lines)
-            y0 = min(lb.bbox.y0 for lb in lines)
-            x1 = max(lb.bbox.x1 for lb in lines)
-            y1 = max(lb.bbox.y1 for lb in lines)
-            self.bbox = Bbox(x0, y0, x1, y1)
 
         # Определяем отступ первой строки
         if lines:
@@ -346,16 +297,10 @@ class ParagraphBlock(Block):
                 spacing = sum(diffs) / len(diffs)
 
         # Определяем основной стиль абзаца
-        style_weights: dict[Style, int] = defaultdict(int)
-        for tb in lines:
-            if tb.text and tb.style:
-                style_weights[tb.style] += len(tb.text)
-
-        if style_weights:
-            main_style = max(style_weights.items(), key=lambda kv: kv[1])[0]
+        style = get_dominant_style(lines)
         
         self.main_style = ParagraphStyle(
-            main_style,
+            style,
             left_indent,
             text_allignment,
             spacing
@@ -363,62 +308,28 @@ class ParagraphBlock(Block):
 
 @dataclass
 class TableCell:
-    left_border: float
-    right_border: float
-    subblocks: list
-
-    def __init__(self, column_info: ColumnInfo, column: list[TextBlock]):
+    subblocks: list[Block]
+    def __init__(self, column: list[TextBlock], column_info: ColumnInfo):
         self.subblocks = []
-        self.left_border = column_info.left_border
-        self.right_border = column_info.right_border
-        paragraphs = split_column_to_paragraphs(column, column_info)
+        paragraphs = split_column_to_paragraphs(column)
         for paragraph in paragraphs:
             p = ParagraphBlock(
-                0,
-                BlockCoordinate(0, 0),
                 paragraph,
-                self.left_border,
-                self.right_border
+                column_info.left_border,
+                column_info.right_border
             )
             self.subblocks.append(p)
 
 @dataclass
 class TableRow:
     cells: list[TableCell]
-
-    def __init__(self, column_info: ColumnInfo, columns: list[list[TextBlock]]):
-        self.cells = [TableCell(column_info[i], columns[i]) for i in range(len(columns))]
+    def __init__(self, lines: list[LineBlock], column_info: list[ColumnInfo]):
+        columns = group_columns(lines)
+        self.cells = [TableCell(column, column_info[i]) for i, column in enumerate(columns)]
 
 @dataclass
 class TableBlock(Block):
     rows: list[TableRow]
-
-
-@dataclass
-class TitleBlock:
-    university: Optional[str] = None
-    faculty: Optional[str] = None
-    practice_type: Optional[str] = None
-    student: Optional[str] = None
-    supervisor: Optional[str] = None
-    student_group: Optional[str] = None
-    supervisor_position: Optional[str] = None
-    major: Optional[str] = None
-    specialization: Optional[str] = None
-    year: Optional[int] = None
-
-
-@dataclass
-class TocEntry:
-    title: str
-    page: int
-    raw_text: str
-    block: Block = None
-
-
-@dataclass 
-class TocBlock(Block):
-    entries: dict[str, TocEntry]
 
 @dataclass
 class SectionBlock(Block):
@@ -427,24 +338,38 @@ class SectionBlock(Block):
     subblocks: list[Block]
 
 @dataclass
-class Caption:
-    number: int
+class TocEntry:
     title: str
-    block: ParagraphBlock
+    page: int
+    block_ref: SectionBlock = None
+
+@dataclass
+class TocBlock(Block):
+    entries: dict[str, TocEntry]
+
+@dataclass
+class FigureBlock(Block):
+    image: str
+
+@dataclass
+class TitleBlock(Block):
+    subblocks: list[Block]
 
 @dataclass
 class DocumentBlock:
-    toc: TocBlock
     title: TitleBlock
+    toc: TocBlock
     subblocks: list[Block]
-    table_captions: list[Caption] = None
-    figure_captions: list[Caption] = None
     def json_serialize(self):
         def universal_serializer(obj):
             if isinstance(obj, Enum):
                 return obj.value
             if is_dataclass(obj):
-                return asdict(obj)
+                return {
+                    f.name: getattr(obj, f.name) 
+                    for f in fields(obj) 
+                    if not f.name.endswith('_ref')
+                }
             return str(obj)
         
         return json.dumps(
@@ -453,40 +378,4 @@ class DocumentBlock:
             ensure_ascii=False, 
             indent=4
         )
-    
 
-# ==========================================================
-
-class Parser(Enum):
-    NONE = 0
-    
-    # Бакалавры
-    INTRODUCTION = 1                 # Введение
-    STAGE_DESCRIPTION = 2            # Описание выполнения этапов
-    LECTURES = 3                     # Лекции
-    THESIS_TEMPLATE = 4              # Шаблон для вкр
-    TECHNICAL_TASK = 5               # Техническое задание
-    CONCLUSION = 6                   # Заключение
-    REFERENCES = 7                   # Список литературы
-    APPENDIX_A = 8                   # Приложение А
-    APPENDIX_B = 9                   # Приложение Б
-
-    # Магистры
-    MAG_INTRODUCTION = 101            # Введение
-    DOMAIN_ANALYSIS = 102             # Анализ предметной области
-    MODEL_DESIGN = 103                # Проектирование модели
-    MODEL_IMPLEMENTATION = 104        # Реализация модели
-    TESTING_RESEARCH = 105            # Тестирование и исследование
-    MAG_CONCLUSION = 106              # Заключение
-
-# output of parsers_matcher, input for parsers
-@dataclass
-class FlatBlocks:
-    parser: Parser # seted by parsers_matcher
-    blocks: list[FlatBlockInfo]
-
-@dataclass
-class FlatBlockInfo:
-    id: int
-    type: BlockType
-    metainfo: BlockMetainfo
