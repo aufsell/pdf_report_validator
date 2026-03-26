@@ -1,13 +1,5 @@
 import re
 from typing import Optional
-import fitz
-
-from ..models.structured_document import (
-    StructuredDocument,
-    BlockInfo,
-    BlockType,
-    TitleMetainfo,
-)
 
 def iter_lines(page_dict: dict):
     """Генератор: каждая строка титульного листа как dict {text, bbox, spans}."""
@@ -150,76 +142,3 @@ def detect_year(line: dict) -> Optional[int]:
         except ValueError:
             return None
     return None
-
-
-def parse_title(page: dict) -> BlockInfo:
-    page_width = page["width"]
-
-    meta = TitleMetainfo()
-
-    for line in iter_lines(page):
-        text = line["text"].strip()
-        print(text)
-
-        # университет
-        if meta.university is None:
-            u = detect_university(line)
-            if u:
-                meta.university = u
-                continue
-
-        # факультет
-        if meta.faculty is None:
-            f = detect_faculty(line)
-            if f:
-                meta.faculty = f
-                continue
-
-        # студент (ФИО + группа)
-        if meta.student_full_name is None or meta.student_group is None:
-            st = match_student(text)
-            if st:
-                if meta.student_group is None:
-                    meta.student_group = st["student_group"]
-                    meta.practice_type = detect_practice_type(st["student_group"])
-                if meta.student_full_name is None:
-                    meta.student_full_name = st["student_full_name"]
-                continue
-
-        # руководитель
-        if meta.supervisor_full_name is None:
-            sup = match_supervisor(text)
-            if sup:
-                meta.supervisor_full_name = sup["supervisor_full_name"]
-                # при желании здесь же можно попытаться выделить должность
-                continue
-
-        # направление
-        if meta.major is None:
-            maj = match_major(text)
-            if maj:
-                meta.major = maj["major"]
-                continue
-
-        # специальность / профиль
-        if meta.specialization is None:
-            spec = match_specialization(text)
-            if spec:
-                meta.specialization = spec["specialization"]
-                continue
-
-        # год
-        if meta.year is None:
-            y = detect_year(line)
-            if y:
-                meta.year = y
-                continue
-
-
-    block = BlockInfo(
-        id=0,
-        type=BlockType.TITLE,
-        metainfo=meta,
-        subblocks=[],
-    )
-    return block
