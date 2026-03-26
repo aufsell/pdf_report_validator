@@ -4,6 +4,240 @@ from enum import Enum
 import json
 import re
 
+@dataclass
+class ColumnInfo:
+    left_border: float
+    right_border: float
+
+@dataclass
+class TableInfo:
+    page: int
+    columns: list[ColumnInfo]
+    horizontal_lines: list[float]
+
+@dataclass
+class Bbox:
+    x0: float
+    x1: float
+    y0: float
+    y1: float
+
+@dataclass(frozen=True)
+class Style:
+    font: str
+    size: float
+    color: int
+
+    def __eq__(self, other):
+        return (
+            self.font == other.font and
+            self.size == other.size and
+            self.color == other.color
+        )
+
+@dataclass
+class AnchorBlock:
+    bbox: Bbox
+
+@dataclass
+class TextBlock(AnchorBlock):
+    text: str
+    style: Style
+
+    @classmethod
+    def from_span(cls, span: dict):
+        x0, y0, x1, y1 = span["bbox"]
+        bbox = Bbox(x0, x1, y0, y1)
+        style = Style(
+            font=span.get("font", ""),
+            size=span.get("size", 0.0),
+            color=span.get("color", 0),
+        )
+        text = span.get("text", "")
+        return cls(bbox, text, style)
+
+    def empty(self):
+        return not self.text.strip()
+    
+    def compute_left_indent(self, left_border):
+        return self.bbox.x0 - left_border
+    
+    def compute_right_indent(self, right_border):
+        return right_border - self.bbox.x1
+
+
+@dataclass
+class ImageBlock(AnchorBlock):
+    image: str
+    @classmethod
+    def from_image(cls, block: dict):
+        bbox = block["bbox"]
+        new_bbox = Bbox(bbox[0], bbox[2], bbox[1], bbox[3])
+        image = block.get("image")
+        image_str = base64.b64encode(image).decode('ascii')
+        return cls(new_bbox, image_str)
+
+@dataclass
+class LineBlock(AnchorBlock):
+    blocks: list[AnchorBlock]
+    page: int
+    def __init__(self, page, blocks: list[AnchorBlock]):
+        self.blocks = blocks
+        self.page = page
+        y1 = max(b.bbox.y1 for b in blocks)
+        first_block = blocks[0]
+        last_block = blocks[-1]
+        self.bbox = Bbox(first_block.bbox.x0, last_block.bbox.x1, first_block.bbox.y0, y1)
+    def text(self):
+        return "".join(block.text.strip() for block in self.blocks)
+
+#==================================================================================#
+
+class Block:
+    pass
+
+class TextAllignment(Enum):
+    LEFT = 1
+    CENTER = 2
+    RIGHT = 3
+    WIDTH = 4
+
+@dataclass
+class ParagraphStyle:
+    style: Style
+    left_indent: float
+    text_alignment: TextAllignment
+    spacing: float
+
+@dataclass
+class ParagraphBlock(Block):
+    main_style: ParagraphStyle = None
+    text: str = None
+    def __init__(self, lines: list[TextBlock], left_border: float, right_border: float):
+        spacing = 0.0
+
+        # Определяем полный текст абзаца
+        lines_text: str = ""
+        for line in lines:
+            text = line.text.strip()
+            lines_text = (lines_text[:-1] if lines_text.endswith("-") else lines_text + (" " if lines_text else "")) + text
+        self.text = lines_text
+
+        # Определяем отступ первой строки
+        if lines:
+            first_line = lines[0]
+            left_indent = max(0.0, first_line.bbox.x0 - left_border)
+
+        # Определяем выравнивание
+        text_allignment = detect_alignment(lines, left_border, right_border)
+
+        # Вычисляем междустрочный интервал
+        if len(lines) >= 2:
+            ys = sorted(lb.bbox.y0 for lb in lines)
+            diffs = [ys[i + 1] - ys[i] for i in range(len(ys) - 1)]
+            if diffs:
+                spacing = sum(diffs) / len(diffs)
+
+        # Определяем основной стиль абзаца
+        style = get_dominant_style(lines)
+        
+        self.main_style = ParagraphStyle(
+            style,
+            left_indent,
+            text_allignment,
+            spacing
+        )
+
+@dataclass
+class TableCell:
+    subblocks: list[Block]
+    def __init__(self, column: list[TextBlock], column_info: ColumnInfo):
+        self.subblocks = []
+        paragraphs = split_column_to_paragraphs(column)
+        for paragraph in paragraphs:
+            p = ParagraphBlock(
+                paragraph,
+                column_info.left_border,
+                column_info.right_border
+            )
+            self.subblocks.append(p)
+
+@dataclass
+class TableRow:
+    cells: list[TableCell]
+    def __init__(self, lines: list[LineBlock], column_info: list[ColumnInfo]):
+        columns = group_columns(lines)
+        self.cells = [TableCell(column, column_info[i]) for i, column in enumerate(columns)]
+
+@dataclass
+class TableBlock(Block):
+    rows: list[TableRow]
+
+@dataclass
+class SectionBlock(Block):
+    title: ParagraphBlock
+    level: int
+    subblocks: list[Block]
+
+@dataclass
+class TocEntry:
+    title: str
+    page: int
+    block_ref: SectionBlock = None
+
+@dataclass
+class TocBlock(Block):
+    entries: dict[str, TocEntry]
+
+@dataclass
+class FigureBlock(Block):
+    image: str
+
+@dataclass
+class TitleBlock(Block):
+    subblocks: list[Block]
+
+@dataclass
+class DocumentBlock:
+    title: TitleBlock
+    toc: TocBlock
+    subblocks: list[Block]
+    @staticmethod
+    def universal_serializer(obj):
+        if isinstance(obj, Enum):
+            return obj.value
+        if is_dataclass(obj):
+            return {
+                f.name: getattr(obj, f.name) 
+                for f in fields(obj) 
+                if not f.name.endswith('_ref')
+            }
+        return str(obj)
+        
+    def json_serialize(self):
+        return json.dumps(
+            self,
+            default=self.universal_serializer,
+            ensure_ascii=False, 
+            indent=4
+        )
+
+#==================================================================================#
+
+@dataclass
+class TableCaption:
+    title: str
+    num: int
+    table_ref: TableBlock = None 
+
+@dataclass
+class FigureCaption:
+    title: str
+    num: int
+    figure_ref: FigureBlock = None  
+
+#==================================================================================#
+
 def get_dominant_style(blocks: list[TextBlock]) -> Style:
     if not blocks:
         return Style()
@@ -148,234 +382,3 @@ def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float
 
     is_last_incomplete = avg_right * 2 - last_tb.bbox.x1 > p_x1 - x_tol
     return not is_last_incomplete
-
-
-@dataclass
-class ColumnInfo:
-    left_border: float
-    right_border: float
-
-@dataclass
-class TableInfo:
-    page: int
-    columns: list[ColumnInfo]
-    horizontal_lines: list[float]
-
-@dataclass
-class Bbox:
-    x0: float
-    x1: float
-    y0: float
-    y1: float
-
-@dataclass(frozen=True)
-class Style:
-    font: str
-    size: float
-    color: int
-
-    def __eq__(self, other):
-        return (
-            self.font == other.font and
-            self.size == other.size and
-            self.color == other.color
-        )
-
-@dataclass
-class AnchorBlock:
-    bbox: Bbox
-
-@dataclass
-class TextBlock(AnchorBlock):
-    text: str
-    style: Style
-
-    @classmethod
-    def from_span(cls, span: dict):
-        x0, y0, x1, y1 = span["bbox"]
-        bbox = Bbox(x0, x1, y0, y1)
-        style = Style(
-            font=span.get("font", ""),
-            size=span.get("size", 0.0),
-            color=span.get("color", 0),
-        )
-        text = span.get("text", "")
-        return cls(bbox, text, style)
-
-    def empty(self):
-        return not self.text.strip()
-    
-    def compute_left_indent(self, left_border):
-        return self.bbox.x0 - left_border
-    
-    def compute_right_indent(self, right_border):
-        return right_border - self.bbox.x1
-
-
-@dataclass
-class ImageBlock(AnchorBlock):
-    image: str
-    @classmethod
-    def from_image(cls, block: dict):
-        bbox = block["bbox"]
-        new_bbox = Bbox(bbox[0], bbox[2], bbox[1], bbox[3])
-        image = block.get("image")
-        image_str = base64.b64encode(image).decode('ascii')
-        return cls(new_bbox, image_str)
-
-@dataclass
-class LineBlock(AnchorBlock):
-    blocks: list[AnchorBlock]
-    page: int
-    def __init__(self, page, blocks: list[AnchorBlock]):
-        self.blocks = blocks
-        self.page = page
-        y1 = max(b.bbox.y1 for b in blocks)
-        first_block = blocks[0]
-        last_block = blocks[-1]
-        self.bbox = Bbox(first_block.bbox.x0, last_block.bbox.x1, first_block.bbox.y0, y1)
-    def text(self):
-        return "".join(block.text.strip() for block in self.blocks)
-
-@dataclass
-class TableCaption:
-    title: str
-    num: int
-    table_ref: TableBlock = None 
-
-@dataclass
-class FigureCaption:
-    title: str
-    num: int
-    figure_ref: FigureBlock = None  
-
-#==================================================================================#
-
-class Block:
-    pass
-
-class TextAllignment(Enum):
-    LEFT = 1
-    CENTER = 2
-    RIGHT = 3
-    WIDTH = 4
-
-@dataclass
-class ParagraphStyle:
-    style: Style
-    left_indent: float
-    text_alignment: TextAllignment
-    spacing: float
-
-@dataclass
-class ParagraphBlock(Block):
-    main_style: ParagraphStyle = None
-    text: str = None
-    def __init__(self, lines: list[TextBlock], left_border: float, right_border: float):
-        spacing = 0.0
-
-        # Определяем полный текст абзаца
-        lines_text: str = ""
-        for line in lines:
-            text = line.text.strip()
-            lines_text = (lines_text[:-1] if lines_text.endswith("-") else lines_text + (" " if lines_text else "")) + text
-        self.text = lines_text
-
-        # Определяем отступ первой строки
-        if lines:
-            first_line = lines[0]
-            left_indent = max(0.0, first_line.bbox.x0 - left_border)
-
-        # Определяем выравнивание
-        text_allignment = detect_alignment(lines, left_border, right_border)
-
-        # Вычисляем междустрочный интервал
-        if len(lines) >= 2:
-            ys = sorted(lb.bbox.y0 for lb in lines)
-            diffs = [ys[i + 1] - ys[i] for i in range(len(ys) - 1)]
-            if diffs:
-                spacing = sum(diffs) / len(diffs)
-
-        # Определяем основной стиль абзаца
-        style = get_dominant_style(lines)
-        
-        self.main_style = ParagraphStyle(
-            style,
-            left_indent,
-            text_allignment,
-            spacing
-        )
-
-@dataclass
-class TableCell:
-    subblocks: list[Block]
-    def __init__(self, column: list[TextBlock], column_info: ColumnInfo):
-        self.subblocks = []
-        paragraphs = split_column_to_paragraphs(column)
-        for paragraph in paragraphs:
-            p = ParagraphBlock(
-                paragraph,
-                column_info.left_border,
-                column_info.right_border
-            )
-            self.subblocks.append(p)
-
-@dataclass
-class TableRow:
-    cells: list[TableCell]
-    def __init__(self, lines: list[LineBlock], column_info: list[ColumnInfo]):
-        columns = group_columns(lines)
-        self.cells = [TableCell(column, column_info[i]) for i, column in enumerate(columns)]
-
-@dataclass
-class TableBlock(Block):
-    rows: list[TableRow]
-
-@dataclass
-class SectionBlock(Block):
-    title: ParagraphBlock
-    level: int
-    subblocks: list[Block]
-
-@dataclass
-class TocEntry:
-    title: str
-    page: int
-    block_ref: SectionBlock = None
-
-@dataclass
-class TocBlock(Block):
-    entries: dict[str, TocEntry]
-
-@dataclass
-class FigureBlock(Block):
-    image: str
-
-@dataclass
-class TitleBlock(Block):
-    subblocks: list[Block]
-
-@dataclass
-class DocumentBlock:
-    title: TitleBlock
-    toc: TocBlock
-    subblocks: list[Block]
-    def json_serialize(self):
-        def universal_serializer(obj):
-            if isinstance(obj, Enum):
-                return obj.value
-            if is_dataclass(obj):
-                return {
-                    f.name: getattr(obj, f.name) 
-                    for f in fields(obj) 
-                    if not f.name.endswith('_ref')
-                }
-            return str(obj)
-        
-        return json.dumps(
-            self,
-            default=universal_serializer,
-            ensure_ascii=False, 
-            indent=4
-        )
-

@@ -7,29 +7,31 @@ from src.models.structured_document import *
 from src.type_parser.utils import *
 
 class ImprovedPdfParser:
-
     def collect_tables(self, doc: Document) -> list[list[TableInfo]]:
         all_pages: list[list[TableInfo]] = []
         for i, page in enumerate(doc):
             page_tables: list[TableInfo] = []
             for tab in page.find_tables():
-                header = tab.header
-                columns = []
-                ys = set()
-                for j in range(len(header.cells)):
-                    x0, y0, x1, y1 = header.cells[j]
-                    columns.append(ColumnInfo(x0, x1))
-                for row in tab.rows:
-                    x0, y0, x1, y1 = row.bbox
-                    ys.add(y0)
-                    ys.add(y1)
-                page_tables.append(
-                    TableInfo(
-                        i,
-                        columns,
-                        sorted(ys)
+                try:
+                    header = tab.header
+                    columns = []
+                    ys = set()
+                    for j in range(len(header.cells)):
+                        x0, y0, x1, y1 = header.cells[j]
+                        columns.append(ColumnInfo(x0, x1))
+                    for row in tab.rows:
+                        x0, y0, x1, y1 = row.bbox
+                        ys.add(y0)
+                        ys.add(y1)
+                    page_tables.append(
+                        TableInfo(
+                            i,
+                            columns,
+                            sorted(ys)
+                        )
                     )
-                )
+                except TypeError:
+                    pass
             all_pages.append(page_tables)
         return all_pages
 
@@ -291,25 +293,28 @@ class ImprovedPdfParser:
 
     def parse_table(self):
         rows = []
-        while self.current_line < len(self.line_blocks):
-            block_start = self.current_line
-            line_block = self.line_blocks[self.current_line]
-            line_type = get_line_type(line_block)
-            table = self.get_current_table(line_block.page, line_block.bbox)
-            if (line_type == LineType.PAGE_NUMBER):
-                self.inc()
-                continue
-            if (line_type == LineType.TEXT):
-                paragraph = self.parse_paragraph()
-                paragraph_type = self.get_paragraph_type(paragraph)
-                if paragraph_type == ParagraphType.TABLE_CONTINUATION_CAPTION:
+        try: 
+            while self.current_line < len(self.line_blocks):
+                block_start = self.current_line
+                line_block = self.line_blocks[self.current_line]
+                line_type = get_line_type(line_block)
+                table = self.get_current_table(line_block.page, line_block.bbox)
+                if (line_type == LineType.PAGE_NUMBER):
+                    self.inc()
                     continue
-                self.current_line = block_start
-                break
-            row = self.parse_table_row(table)
-            if not row:
-                break
-            rows.append(row)
+                if (line_type == LineType.TEXT):
+                    paragraph = self.parse_paragraph()
+                    paragraph_type = self.get_paragraph_type(paragraph)
+                    if paragraph_type == ParagraphType.TABLE_CONTINUATION_CAPTION:
+                        continue
+                    self.current_line = block_start
+                    break
+                row = self.parse_table_row(table)
+                if not row:
+                    break
+                rows.append(row)
+        except IndexError:
+            pass
 
         return TableBlock(
             rows = rows

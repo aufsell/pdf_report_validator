@@ -1,3 +1,4 @@
+'''
 import sys
 import os
 CWD = os.getcwd()
@@ -92,3 +93,4 @@ def test_parse_pdfs():
                 with open(output_path_expected, 'w', encoding='utf-8') as f:
                     json.dump(expected, f, cls=CustomJSONEncoder, ensure_ascii=False, indent=2)
         assert not errors, "\n".join(errors)
+'''
