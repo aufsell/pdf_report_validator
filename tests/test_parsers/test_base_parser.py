@@ -11,7 +11,7 @@ from src.parsers_matcher.matcher import ParsersMatcher
 from src.parsers.base_parser import DocumentStructureValidator
 from src.models.message import *
 
-write_mode = True
+write_mode = False
 
 def test_parse_pdfs():
     input_dir = os.path.join(CWD, "tests/PDFs")
