@@ -348,6 +348,7 @@ def is_list_start(text: str) -> bool:
 
 
 def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float = 0.8, tol: float = 90.0):
+    
     if not prev_tbs:
         return True
     last_tb = prev_tbs[-1]
@@ -382,6 +383,7 @@ def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float
 
     if abs(cur_tb.bbox.x0 - p_x0) >= x_tol:
         return False
-
+    
     is_last_incomplete = (last_tb.bbox.x1 - last_tb.bbox.x0) / (avg_right - avg_left) * 100 <= tol
+
     return not is_last_incomplete
