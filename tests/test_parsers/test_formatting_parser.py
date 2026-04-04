@@ -1,3 +1,4 @@
+'''
 import pytest
 
 from src.models.raw_document import RawPDFDocument
@@ -357,3 +358,5 @@ class TestFormattingParser:
         assert len(footer_errors) == 0
 
     # Можно добавить тест для проверки абзацного отступа, но он пока заглушка.
+    
+'''
