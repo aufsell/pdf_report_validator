@@ -8,7 +8,7 @@ import pytest
 import base64
 from src.type_parser.parser import ImprovedPdfParser
 
-write_mode = True
+write_mode = False
 
 def test_parse_pdfs():
     input_dir = os.path.join(CWD, "tests/PDFs")
@@ -50,7 +50,7 @@ def test_parse_pdfs():
                 continue
 
             # Парсим
-            result = ImprovedPdfParser(fitz.open(input_path)).parse_document().json_serialize();
+            result = ImprovedPdfParser(fitz.open(input_path)).parse_document();
 
             # Загружаем эталон
             with open(output_path, 'r', encoding='utf-8') as f:
@@ -59,7 +59,7 @@ def test_parse_pdfs():
             converted = result
 
             # Сравниваем
-            if json.dumps(converted, sort_keys=True) != json.dumps(expected, sort_keys=True):
+            if json.dumps(converted, default=result.universal_serializer, sort_keys=True, ensure_ascii=False, indent=2) != json.dumps(expected, sort_keys=True, ensure_ascii=False, indent=2):
                 errors.append(f"Несовпадение для {json_file}")
                 # Для отладки сохраняем полученный результат и эталон в отдельную папку
                 debug_dir = os.path.join(CWD, "tests/test_parser")

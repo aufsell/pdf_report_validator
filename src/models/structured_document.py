@@ -347,7 +347,7 @@ def is_list_start(text: str) -> bool:
     return bool(re.match(list_pattern, s))
 
 
-def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float = 0.8):
+def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float = 0.8, tol: float = 90.0):
     if not prev_tbs:
         return True
     last_tb = prev_tbs[-1]
@@ -367,6 +367,8 @@ def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float
     body_for_right = prev_tbs[:-1]
 
     if not body_for_left:
+        if re.search(r"\.\s*[\.\s]*\d+\s*$", last_text):
+            return False
         if is_list_start(last_text):
             return cur_tb.bbox.x0 - last_tb.bbox.x0 > x_tol
         if cur_tb.bbox.x0 < last_tb.bbox.x0 - x_tol:
@@ -375,10 +377,11 @@ def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float
     
     p_x0 = min(tb.bbox.x0 for tb in body_for_left)
     p_x1 = max(tb.bbox.x1 for tb in body_for_right)
+    avg_left = sum(tb.bbox.x0 for tb in body_for_left) / len(body_for_left)
     avg_right = sum(tb.bbox.x1 for tb in body_for_right) / len(body_for_right)
 
     if abs(cur_tb.bbox.x0 - p_x0) >= x_tol:
         return False
 
-    is_last_incomplete = avg_right * 2 - last_tb.bbox.x1 > p_x1 - x_tol
+    is_last_incomplete = (last_tb.bbox.x1 - last_tb.bbox.x0) / (avg_right - avg_left) * 100 <= tol
     return not is_last_incomplete
