@@ -1,6 +1,8 @@
 **.pdf
-main.py
 doc.py
 **DS_Store
 **pycache**
 **.json
+dist/
+build/
+.venv/
