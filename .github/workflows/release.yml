@@ -1,0 +1,73 @@
+name: Build & Release
+
+# Запускается при создании тега вида v1.0.0
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: PDFReportValidator-macOS
+          - os: windows-latest
+            artifact: PDFReportValidator-Windows
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          pip install pymupdf PyQt6 pyinstaller
+
+      - name: Build executable
+        run: |
+          pyinstaller PDFReportValidator.spec
+
+      # macOS: zip .app / binary
+      - name: Package (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          zip -r ../${{ matrix.artifact }}.zip PDFReportValidator
+
+      # Windows: zip .exe
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist\PDFReportValidator.exe -DestinationPath ${{ matrix.artifact }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            PDFReportValidator-macOS/PDFReportValidator-macOS.zip
+            PDFReportValidator-Windows/PDFReportValidator-Windows.zip
+          generate_release_notes: true

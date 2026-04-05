@@ -1,2 +1,4 @@
 pytest
 pymupdf
+PyQt6
+pyinstaller
