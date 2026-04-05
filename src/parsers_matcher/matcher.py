@@ -340,7 +340,6 @@ class ParsersMatcher:
     def match(self, messages: MessageCollector) -> List[FlatBlocks]:
         """Обходит структуру документа и возвращает список FlatBlocks."""
         result = []
-        messages = []
         self.ismag = False
 
         # Титульный лист
