@@ -33,13 +33,21 @@ jobs:
         run: |
           pip install pymupdf PyQt6 pyinstaller
 
-      - name: Build executable
+      - name: Debug — list files
         run: |
-          pyinstaller PDFReportValidator.spec
+          echo "pwd: $(pwd)"
+          ls -la app/ || echo "no app/ dir"
+          ls -la PDFReportValidator.spec || echo "no spec"
+
+      - name: Build executable
+        working-directory: ${{ github.workspace }}
+        run: |
+          pyinstaller PDFReportValidator.spec --clean
 
       # macOS: zip .app / binary
       - name: Package (macOS)
         if: runner.os == 'macOS'
+        working-directory: ${{ github.workspace }}
         run: |
           cd dist
           zip -r ../${{ matrix.artifact }}.zip PDFReportValidator
@@ -47,6 +55,7 @@ jobs:
       # Windows: zip .exe
       - name: Package (Windows)
         if: runner.os == 'Windows'
+        working-directory: ${{ github.workspace }}
         shell: pwsh
         run: |
           Compress-Archive -Path dist\PDFReportValidator.exe -DestinationPath ${{ matrix.artifact }}.zip
