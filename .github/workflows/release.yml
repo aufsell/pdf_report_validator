@@ -34,13 +34,14 @@ jobs:
           pip install pymupdf PyQt6 pyinstaller
 
       - name: Debug — list files
+        shell: bash
         run: |
           echo "pwd: $(pwd)"
-          ls -la app/ || echo "no app/ dir"
-          ls -la PDFReportValidator.spec || echo "no spec"
+          ls app/ || echo "no app/ dir"
+          ls PDFReportValidator.spec || echo "no spec"
 
       - name: Build executable
-        working-directory: ${{ github.workspace }}
+        shell: bash
         run: |
           pyinstaller PDFReportValidator.spec --clean
 
