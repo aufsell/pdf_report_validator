@@ -105,13 +105,13 @@ class ParsersMatcher:
         "Список источников": Parser.REFERENCES,
         "Список использованных источников": Parser.REFERENCES,
         
+        "Приложение Б": Parser.APPENDIX_B,
+        "Приложение А": Parser.APPENDIX_A,
+        
         "Приложение": Parser.APPENDIX_A,
         
         "Приложение 1": Parser.APPENDIX_A,
         "Приложение 2": Parser.APPENDIX_B,
-        
-        "Приложение А": Parser.APPENDIX_A,
-        "Приложение Б": Parser.APPENDIX_B,
     }
 
     HEADER_TO_PARSER_BACH = {
@@ -126,13 +126,13 @@ class ParsersMatcher:
         "Список источников": Parser.REFERENCES,
         "Список использованных источников": Parser.REFERENCES,
         
+        "Приложение Б": Parser.APPENDIX_B,
+        "Приложение А": Parser.APPENDIX_A,
+        
         "Приложение": Parser.APPENDIX_A,
         
         "Приложение 1": Parser.APPENDIX_A,
         "Приложение 2": Parser.APPENDIX_B,
-        
-        "Приложение А": Parser.APPENDIX_A,
-        "Приложение Б": Parser.APPENDIX_B,
     }
 
     def __init__(self, documentBlock: DocumentBlock):
@@ -332,7 +332,7 @@ class ParsersMatcher:
                 if hasattr(sub, 'text'):
                     texts.append(sub.text)
         full_text = "\n".join(texts)
-        ismag = contains_fuzzy(full_text, "Научно-исследовательская работа") and contains_fuzzy(full_text, "производственной, технологической практике ");
+        ismag = contains_fuzzy(full_text, "Научно-исследовательская работа") or contains_fuzzy(full_text, "производственной, технологической практике ");
         return BlockMetainfo(text=full_text, extra={'lines': texts, 'ismag': ismag}), ismag
 
     def _extract_metainfo_for_toc_block(self, toc_block) -> BlockMetainfo:
