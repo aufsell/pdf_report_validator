@@ -3,6 +3,7 @@ from dataclasses import asdict, dataclass, fields, is_dataclass
 from enum import Enum
 import json
 import re
+import unicodedata
 
 @dataclass
 class ColumnInfo:
@@ -54,6 +55,7 @@ class TextBlock(AnchorBlock):
             color=span.get("color", 0),
         )
         text = span.get("text", "")
+        text = clean_invisible_chars(text)
         return cls(bbox, text, style)
 
     def empty(self):
@@ -89,7 +91,7 @@ class LineBlock(AnchorBlock):
         last_block = blocks[-1]
         self.bbox = Bbox(first_block.bbox.x0, last_block.bbox.x1, first_block.bbox.y0, y1)
     def text(self):
-        return "".join(block.text.strip() for block in self.blocks)
+        return "".join(block.text.strip() for block in self.blocks if hasattr(block, 'text')) 
 
 #==================================================================================#
 
@@ -119,8 +121,14 @@ class ParagraphBlock(Block):
         # Определяем полный текст абзаца
         lines_text: str = ""
         for line in lines:
-            text = line.text.strip()
-            lines_text = (lines_text[:-1] if lines_text.endswith("-") else lines_text + (" " if lines_text else "")) + text
+            text = clean_invisible_chars(line.text)
+            if not text:
+                continue
+            if lines_text.endswith(("-", "\xad")):
+                lines_text = lines_text[:-1] + text
+            else:
+                lines_text += (" " if lines_text else "") + text
+
         self.text = lines_text
 
         # Определяем отступ первой строки
@@ -280,7 +288,7 @@ def detect_alignment(
     lines: list[TextBlock],
     left_border: float,
     right_border: float,
-    tol: float = 10,
+    tol: float = 25,
 ) -> TextAllignment:
     if not lines:
         return TextAllignment.LEFT
@@ -316,10 +324,14 @@ def detect_alignment(
         left_indent = lefts_all[0]
         right_indent = rights_all[0]
 
-        if abs(left_indent) <= tol:
+        if 2 * left_indent < right_indent:
             return TextAllignment.LEFT
-        if abs(right_indent) <= tol:
+        if 2 * right_indent < left_indent:
             return TextAllignment.RIGHT
+        if left_indent > tol:
+            return TextAllignment.CENTER
+        else:
+            return TextAllignment.WIDTH
         
     page_center = (left_border + right_border) / 2.0
     centers = []
@@ -331,7 +343,7 @@ def detect_alignment(
     if all(abs(c - page_center) / (right_border - left_border) * 100 <= tol for c in centers):
         return TextAllignment.CENTER
 
-    return TextAllignment.LEFT
+    return TextAllignment.WIDTH
 
 
 def is_list_start(text: str) -> bool:
@@ -373,6 +385,8 @@ def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float
         if is_list_start(last_text):
             return cur_tb.bbox.x0 - last_tb.bbox.x0 > x_tol
         if cur_tb.bbox.x0 < last_tb.bbox.x0 - x_tol:
+            if last_text.endswith("."):
+                return False
             return True
         return False
     
@@ -387,3 +401,9 @@ def is_same_paragraph(prev_tbs: list[TextBlock], cur_tb: TextBlock, x_tol: float
     is_last_incomplete = (last_tb.bbox.x1 - last_tb.bbox.x0) / (avg_right - avg_left) * 100 <= tol
 
     return not is_last_incomplete
+
+def clean_invisible_chars(text):
+    text = "".join(ch for ch in text if unicodedata.category(ch)[0] not in ['C'] or ch == '\xad')
+    text = text.replace('\xa0', ' ')
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
