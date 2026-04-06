@@ -123,7 +123,7 @@ def format_messages(collector: MessageCollector) -> List[str]:
 def run_pipeline(path: str) -> tuple:
     """
     Запускает пайплайн для одного PDF.
-    Возвращает (оценка, список_замечаний, текст_ошибки_или_None).
+    Возвращает (оценка, is_mag, список_замечаний, текст_ошибки_или_None).
     """
     try:
         collector = MessageCollector()
@@ -131,10 +131,11 @@ def run_pipeline(path: str) -> tuple:
         result = ImprovedPdfParser(doc).parse_document()
         matcher = ParsersMatcher(result)
         sections = matcher.match(collector)
+        is_mag = matcher.ismag
         DocumentStructureValidator(sections, collector).validate()
-        return extract_grade(collector), format_messages(collector), None
+        return extract_grade(collector), is_mag, format_messages(collector), None
     except Exception:
-        return None, [], traceback.format_exc()
+        return None, None, [], traceback.format_exc()
 
 
 # --- Главное окно ---
@@ -215,7 +216,7 @@ class PdfCheckerWindow(QtWidgets.QWidget):
 
         for f in files:
             name = os.path.basename(f)
-            grade, messages, error = run_pipeline(f)
+            grade, is_mag, messages, error = run_pipeline(f)
 
             part = f'<h3 style="margin-bottom:4px">{name}</h3>'
 
@@ -224,6 +225,14 @@ class PdfCheckerWindow(QtWidgets.QWidget):
                 part += ('<p style="color:#c0392b">⚠ Не удалось обработать файл</p>'
                          f'<pre style="font-size:11px;color:#999">{error[:300]}</pre>')
             else:
+                # Тип работы
+                if is_mag is not None:
+                    work_type = 'Магистратура' if is_mag else 'Бакалавриат'
+                    badge_color = '#8e44ad' if is_mag else '#2980b9'
+                    part += (f'<span style="background:{badge_color};color:#fff;'
+                             f'padding:2px 8px;border-radius:4px;font-size:12px">'
+                             f'{work_type}</span> ')
+
                 # Оценка (если есть)
                 if grade:
                     color = {'5': '#27ae60', '4': '#f39c12', '3': '#c0392b'}.get(grade, '#333')
