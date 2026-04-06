@@ -37,7 +37,7 @@ class ImprovedPdfParser:
 
     def collect_lines(self, pages: dict) -> list[LineBlock]:
         line_blocks: list[LineBlock] = []
-        threshold = 1.5
+        threshold = 2.5
         for page_num, page in enumerate(pages):
             blocks = []
             for block in page.get("blocks", []):
@@ -62,7 +62,11 @@ class ImprovedPdfParser:
             current_line.sort(key=lambda b: b.bbox.x0)
             grouped_blocks.append(current_line)
 
-            line_blocks.extend(self.split_line_into_columns(LineBlock(page_num, line)) for line in grouped_blocks)
+            result = []
+            for line in grouped_blocks:
+                result.append(self.split_line_into_columns(LineBlock(page_num, line)))
+
+            line_blocks.extend(result)
         return line_blocks
 
     def get_current_table(self, page: int, bbox: Bbox):
@@ -83,6 +87,7 @@ class ImprovedPdfParser:
     def split_line_into_columns(self, line: LineBlock) -> LineBlock:
         if get_line_type(line) == LineType.FIGURE:
             return line
+        line.blocks = [b for b in line.blocks if hasattr(b, 'text')]
         bbox = line.bbox
         table = self.get_current_table(line.page, bbox)
         blocks_iter = iter(line.blocks)
@@ -111,7 +116,7 @@ class ImprovedPdfParser:
                 )
                 blocks.append(TextBlock(new_bbox, text, merged_style))
             else:
-                res_bbox = Bbox(col.left_border, line.bbox.y0, col.right_border, line.bbox.y1)
+                res_bbox = Bbox(col.left_border, col.right_border, line.bbox.y0, line.bbox.y1)
                 blocks.append(TextBlock(res_bbox, "", default_style))
 
         return LineBlock(page=line.page, blocks=blocks)
