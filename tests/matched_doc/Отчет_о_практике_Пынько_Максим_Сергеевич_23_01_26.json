@@ -3824,29 +3824,25 @@
           "caption": "",
           "extra": {}
         }
-      },
+      }
+    ]
+  },
+  {
+    "parser": 8,
+    "blocks": [
       {
-        "id": 13,
-        "type": 4,
+        "id": 0,
+        "type": 3,
         "metainfo": {
-          "level": 0,
+          "level": 1,
           "text": "Приложение 1.",
-          "style": {
-            "style": {
-              "font": "TimesNewRomanPS-BoldMT",
-              "size": 13.920000076293945,
-              "color": 0
-            },
-            "left_indent": 258.6729431152344,
-            "text_alignment": 2,
-            "spacing": 0.0
-          },
+          "style": "",
           "caption": "",
           "extra": {}
         }
       },
       {
-        "id": 14,
+        "id": 1,
         "type": 4,
         "metainfo": {
           "level": 0,
@@ -3866,7 +3862,7 @@
         }
       },
       {
-        "id": 15,
+        "id": 2,
         "type": 5,
         "metainfo": {
           "level": 0,

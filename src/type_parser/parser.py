@@ -131,10 +131,15 @@ class ImprovedPdfParser:
     def is_heading_candidate(self, paragraph: ParagraphBlock):
         text = paragraph.text
         if self.toc:
+            # Точное совпадение
             if self.toc.entries.get(text.lower()):
                 return True
-            else:
-                return False
+            # Нечёткое: проверяем, начинается ли какой-то ключ TOC с текста параграфа
+            text_lower = text.lower().strip()
+            for key in self.toc.entries:
+                if key.startswith(text_lower) or text_lower.startswith(key):
+                    return True
+            return False
         else:
             return False
     
@@ -351,6 +356,14 @@ class ImprovedPdfParser:
             self.toc.entries[title.text].block = section
         return section
     
+    @staticmethod
+    def _clean_toc_title(raw: str) -> str:
+        """Убирает заполнители оглавления (точки, пробелы, спецсимволы) из заголовка."""
+        import re as _re
+        # Удаляем хвост из точек/пробелов/спецсимволов (·•…⁠ и т.п.)
+        cleaned = _re.sub(r'[\s.·•…\u2060\u200B\u00A0]+$', '', raw)
+        return cleaned.strip()
+
     def parse_toc(self, paragraph) -> TocBlock:
         entries: dict[str, TocEntry] = dict()
         while self.current_line < len(self.line_blocks):
@@ -365,7 +378,7 @@ class ImprovedPdfParser:
             paragraph = self.parse_paragraph()
             match = TOC_BLOCK_RE.match(paragraph.text)
             if match:
-                title = match.group("title").strip()
+                title = self._clean_toc_title(match.group("title"))
                 page_num = int(match.group("page"))
                 entry = TocEntry(
                         title=title,

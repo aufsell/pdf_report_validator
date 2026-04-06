@@ -1,5 +1,6 @@
 **.pdf
 doc.py
+_debug*.py
 **DS_Store
 **pycache**
 **.json

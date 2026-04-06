@@ -1511,29 +1511,25 @@
           "caption": "",
           "extra": {}
         }
-      },
+      }
+    ]
+  },
+  {
+    "parser": 8,
+    "blocks": [
       {
-        "id": 15,
-        "type": 4,
+        "id": 0,
+        "type": 3,
         "metainfo": {
-          "level": 0,
+          "level": 4,
           "text": "Приложение Б Код реализации процессоров и бенчмарка",
-          "style": {
-            "style": {
-              "font": "TimesNewRomanPS-BoldMT",
-              "size": 16.079999923706055,
-              "color": 0
-            },
-            "left_indent": 446.3006591796875,
-            "text_alignment": 4,
-            "spacing": 27.599998474121094
-          },
+          "style": "",
           "caption": "",
           "extra": {}
         }
       },
       {
-        "id": 16,
+        "id": 1,
         "type": 4,
         "metainfo": {
           "level": 0,
@@ -1553,7 +1549,7 @@
         }
       },
       {
-        "id": 17,
+        "id": 2,
         "type": 4,
         "metainfo": {
           "level": 0,
@@ -1573,7 +1569,7 @@
         }
       },
       {
-        "id": 18,
+        "id": 3,
         "type": 4,
         "metainfo": {
           "level": 0,
@@ -1593,7 +1589,7 @@
         }
       },
       {
-        "id": 19,
+        "id": 4,
         "type": 4,
         "metainfo": {
           "level": 0,
@@ -1613,7 +1609,7 @@
         }
       },
       {
-        "id": 20,
+        "id": 5,
         "type": 4,
         "metainfo": {
           "level": 0,
@@ -1633,7 +1629,7 @@
         }
       },
       {
-        "id": 21,
+        "id": 6,
         "type": 4,
         "metainfo": {
           "level": 0,

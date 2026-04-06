@@ -1691,95 +1691,100 @@
               "text": "5. Сохранение оригинального форматирования и пунктуации заголовков"
             },
             {
-              "main_style": {
-                "style": {
-                  "font": "TimesNewRomanPS-BoldMT",
-                  "size": 16.079999923706055,
-                  "color": 0
+              "title": {
+                "main_style": {
+                  "style": {
+                    "font": "TimesNewRomanPS-BoldMT",
+                    "size": 16.079999923706055,
+                    "color": 0
+                  },
+                  "left_indent": 446.3006591796875,
+                  "text_alignment": 4,
+                  "spacing": 27.599998474121094
                 },
-                "left_indent": 446.3006591796875,
-                "text_alignment": 4,
-                "spacing": 27.599998474121094
+                "text": "Приложение Б Код реализации процессоров и бенчмарка"
               },
-              "text": "Приложение Б Код реализации процессоров и бенчмарка"
-            },
-            {
-              "main_style": {
-                "style": {
-                  "font": "TimesNewRomanPSMT",
-                  "size": 13.920000076293945,
-                  "color": 0
+              "level": 4,
+              "subblocks": [
+                {
+                  "main_style": {
+                    "style": {
+                      "font": "TimesNewRomanPSMT",
+                      "size": 13.920000076293945,
+                      "color": 0
+                    },
+                    "left_indent": 120.4098892211914,
+                    "text_alignment": 4,
+                    "spacing": 24.23998260498047
+                  },
+                  "text": "Ссылка на репозиторий с исходным кодом: https://github.com/sanchous1000/NIR_code/tree/main"
                 },
-                "left_indent": 120.4098892211914,
-                "text_alignment": 4,
-                "spacing": 24.23998260498047
-              },
-              "text": "Ссылка на репозиторий с исходным кодом: https://github.com/sanchous1000/NIR_code/tree/main"
-            },
-            {
-              "main_style": {
-                "style": {
-                  "font": "TimesNewRomanPS-BoldMT",
-                  "size": 13.920000076293945,
-                  "color": 0
+                {
+                  "main_style": {
+                    "style": {
+                      "font": "TimesNewRomanPS-BoldMT",
+                      "size": 13.920000076293945,
+                      "color": 0
+                    },
+                    "left_indent": 120.4098892211914,
+                    "text_alignment": 1,
+                    "spacing": 0.0
+                  },
+                  "text": "Структура репозитория:"
                 },
-                "left_indent": 120.4098892211914,
-                "text_alignment": 1,
-                "spacing": 0.0
-              },
-              "text": "Структура репозитория:"
-            },
-            {
-              "main_style": {
-                "style": {
-                  "font": "SymbolMT",
-                  "size": 13.920000076293945,
-                  "color": 0
+                {
+                  "main_style": {
+                    "style": {
+                      "font": "SymbolMT",
+                      "size": 13.920000076293945,
+                      "color": 0
+                    },
+                    "left_indent": 120.47999572753906,
+                    "text_alignment": 1,
+                    "spacing": 0.0
+                  },
+                  "text": "-"
                 },
-                "left_indent": 120.47999572753906,
-                "text_alignment": 1,
-                "spacing": 0.0
-              },
-              "text": "-"
-            },
-            {
-              "main_style": {
-                "style": {
-                  "font": "TimesNewRomanPSMT",
-                  "size": 13.920000076293945,
-                  "color": 0
+                {
+                  "main_style": {
+                    "style": {
+                      "font": "TimesNewRomanPSMT",
+                      "size": 13.920000076293945,
+                      "color": 0
+                    },
+                    "left_indent": 155.759765625,
+                    "text_alignment": 4,
+                    "spacing": 24.0
+                  },
+                  "text": "file_processor/ - основной пакет, реализующий логику конвертации и парсинга документов из PPTX и PDF в Markdown."
                 },
-                "left_indent": 155.759765625,
-                "text_alignment": 4,
-                "spacing": 24.0
-              },
-              "text": "file_processor/ - основной пакет, реализующий логику конвертации и парсинга документов из PPTX и PDF в Markdown."
-            },
-            {
-              "main_style": {
-                "style": {
-                  "font": "SymbolMT",
-                  "size": 13.920000076293945,
-                  "color": 0
+                {
+                  "main_style": {
+                    "style": {
+                      "font": "SymbolMT",
+                      "size": 13.920000076293945,
+                      "color": 0
+                    },
+                    "left_indent": 120.47999572753906,
+                    "text_alignment": 1,
+                    "spacing": 0.0
+                  },
+                  "text": "-"
                 },
-                "left_indent": 120.47999572753906,
-                "text_alignment": 1,
-                "spacing": 0.0
-              },
-              "text": "-"
-            },
-            {
-              "main_style": {
-                "style": {
-                  "font": "TimesNewRomanPSMT",
-                  "size": 13.920000076293945,
-                  "color": 0
-                },
-                "left_indent": 155.759765625,
-                "text_alignment": 4,
-                "spacing": 24.000015258789062
-              },
-              "text": "benchmarking/ - подсистема для проведения сравнительного анализа и оценки качества."
+                {
+                  "main_style": {
+                    "style": {
+                      "font": "TimesNewRomanPSMT",
+                      "size": 13.920000076293945,
+                      "color": 0
+                    },
+                    "left_indent": 155.759765625,
+                    "text_alignment": 4,
+                    "spacing": 24.000015258789062
+                  },
+                  "text": "benchmarking/ - подсистема для проведения сравнительного анализа и оценки качества."
+                }
+              ]
             }
           ]
         }

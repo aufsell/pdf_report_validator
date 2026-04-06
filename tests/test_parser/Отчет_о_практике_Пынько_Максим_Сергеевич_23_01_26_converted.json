@@ -2785,20 +2785,25 @@
             "spacing": 0.0
           },
           "text": "URL: https://arxiv.org/abs/2002.10857 (Дата обращения: 5.11.2025)"
-        },
-        {
-          "main_style": {
-            "style": {
-              "font": "TimesNewRomanPS-BoldMT",
-              "size": 13.920000076293945,
-              "color": 0
-            },
-            "left_indent": 258.6729431152344,
-            "text_alignment": 2,
-            "spacing": 0.0
+        }
+      ]
+    },
+    {
+      "title": {
+        "main_style": {
+          "style": {
+            "font": "TimesNewRomanPS-BoldMT",
+            "size": 13.920000076293945,
+            "color": 0
           },
-          "text": "Приложение 1."
+          "left_indent": 258.6729431152344,
+          "text_alignment": 2,
+          "spacing": 0.0
         },
+        "text": "Приложение 1."
+      },
+      "level": 1,
+      "subblocks": [
         {
           "main_style": {
             "style": {
